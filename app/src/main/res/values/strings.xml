@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">GOB Companion</string>
+
+    <string name="general_form_error_required_field">This field is mandatory</string>
+    <string name="general_form_error_invalid_format">Invalid Format</string>
+    <string name="general_form_error_password_invalid">Password must contain a symbol and a number</string>
+    <string name="general_form_error_password_too_short">Password must be at least 8 characters</string>
+
+    <string name="general_home">Home</string>
+    <string name="general_collection">Collection</string>
+    <string name="general_profile">Profile</string>
+
+</resources>

@@ -15,10 +15,6 @@ repositories {
     maven {
         name = "GitHubPackages"
         url = uri("https://maven.pkg.github.com/minikorp/duo")
-        credentials {
-            username = System.getenv("GITHUB_USERNAME")
-            password = System.getenv("GITHUB_TOKEN")
-        }
     }
 }
 
@@ -31,8 +27,8 @@ android {
     defaultConfig {
         minSdk = Constants.minSdkVersion
         targetSdk = Constants.targetSdkVersion
-        versionCode = 1
-        versionName = "0.0.1"
+        versionCode = 2
+        versionName = "0.0.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true

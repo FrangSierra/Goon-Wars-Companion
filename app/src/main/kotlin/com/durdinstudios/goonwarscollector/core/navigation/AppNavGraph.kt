@@ -41,18 +41,13 @@ fun AppNavGraph(
             SplashScreen(
                 navigateToHome = { AppDestination.Home.navigateAndPopStack(navController); removeSystemSplash(false) },
                 navigateToOnBoarding = {
-                    AppDestination.Welcome.navigateAndPopStack(navController); removeSystemSplash(false)
+                    AppDestination.Home.navigateAndPopStack(navController); removeSystemSplash(false)
                 }
             )
         }
 
         appComposable(AppDestination.Login) {
             //TODO implement if we need auth
-        }
-        appComposable(AppDestination.Welcome) {
-            WelcomeScreen {
-                AppDestination.Home.navigateAndPopStack(navController);
-            }
         }
 
         appComposable(AppDestination.ForgetPassword) {

@@ -29,6 +29,7 @@ import com.durdinstudios.goonwarscollector.core.navigation.AppDestination
 import com.durdinstudios.goonwarscollector.ui.base.NavHostControllerComposition
 import com.durdinstudios.goonwarscollector.ui.components.LabelBottomActive
 import com.durdinstudios.goonwarscollector.ui.components.LabelBottomInactive
+import com.durdinstudios.goonwarscollector.ui.theme.Colors
 import com.durdinstudios.goonwarscollector.ui.theme.TextStyles.labelBottomActiveTextStyle
 import com.durdinstudios.goonwarscollector.ui.theme.TextStyles.labelBottomInactiveTextStyle
 
@@ -66,13 +67,13 @@ fun AppBottomBar(
                 )
             ),
         elevation = 8.dp,
-        backgroundColor = Color.Transparent,
+        backgroundColor = Colors.appColorPalette.primaryDark,
         cutoutShape = cutoutShape
     ) {
         // Inflate each navigation item
         BottomNavigation(
             elevation = 8.dp,
-            backgroundColor = Color.Transparent,
+            backgroundColor = Colors.appColorPalette.primaryDark,
             modifier = modifier
                 .height(BOTTOM_BAR_HEIGHT.dp)
                 .fillMaxWidth(),

@@ -5,9 +5,11 @@ import com.durdinstudios.goonwarscollector.core.arch.BaseSaga
 import com.durdinstudios.goonwarscollector.core.arch.Resource
 import com.durdinstudios.goonwarscollector.core.arch.createAppStateSelector
 import com.durdinstudios.goonwarscollector.core.arch.getResourceValue
+import com.durdinstudios.goonwarscollector.core.arch.map
 import com.durdinstudios.goonwarscollector.core.arch.onFailure
 import com.durdinstudios.goonwarscollector.core.arch.onSuccess
 import com.durdinstudios.goonwarscollector.domain.Article
+import com.durdinstudios.goonwarscollector.domain.opensea.NetworkNftInfo
 import com.durdinstudios.goonwarscollector.domain.persistence.PersistenceController
 import com.durdinstudios.goonwarscollector.domain.persistence.settings.Keys
 import com.durdinstudios.goonwarscollector.ui.collection.CollectionCardItem
@@ -30,8 +32,8 @@ val userCardsSelector = createAppStateSelector(p1 = { it.wallet }, selector = {
             val userCards = userCardsResource.getResourceValue()!!
             Resource.success(gobCards.map { card ->
                 val ownership = userCards.firstOrNull { it.id == card.id }
-                val amount = ownership?.ownedRegular ?: if (card.id.startsWith("B")) -1 else 0
-                val shinyAmount = ownership?.ownedShiny ?: if (card.id.startsWith("B")) -1 else 0
+                val amount =  if (card.id.startsWith("B")) -1 else ownership?.ownedRegular ?: 0
+                val shinyAmount =  if (card.id.startsWith("B")) -1 else ownership?.ownedShiny ?: 0
                 CollectionCardItem(card, amount, shinyAmount)
             }.sortedBy { it.card.name })
         }
@@ -45,6 +47,11 @@ val userCardsSelector = createAppStateSelector(p1 = { it.wallet }, selector = {
 
 val articlesSelector = createAppStateSelector(p1 = { it.wallet }, selector = { it.articles })
 val userWallets = createAppStateSelector(p1 = { it.wallet }, selector = { it.walletAddresses })
+val walletsNftsSelector = createAppStateSelector(p1 = { it.wallet }, selector = {
+    it.nfts.map { nfts ->
+        nfts.filter { it.collection == "goonsofbalatroon"} to  nfts.filter { it.collection == "goonbods"}
+    }
+})
 
 @State
 data class WalletState(
@@ -52,7 +59,8 @@ data class WalletState(
     val articles: Resource<List<Article>> = Resource.empty(),
     val stats: Resource<MarketStats> = Resource.empty(),
     val gobCards: Resource<List<GobCard>> = Resource.empty(),
-    val userCards: Resource<List<CardOwnership>> = Resource.empty()
+    val userCards: Resource<List<CardOwnership>> = Resource.empty(),
+    val nfts: Resource<List<Nft>> = Resource.empty()
 ) : Serializable
 
 @TypedReducer
@@ -79,6 +87,14 @@ class WalletSaga(di: DI) : BaseSaga<WalletState>(di) {
         controller.getGobCards()
             .onSuccess { ctx.dispatch(GetGobCardsAction.Response(Resource.success(it))) }
             .onFailure { ctx.dispatch(GetGobCardsAction.Response(Resource.failure(it))) }
+    }
+
+    @TypedReducer.Fun
+    suspend fun getNfts(ctx: ActionContext<WalletState>, action: GetWalletNfts.Request) {
+        ctx.reduce { it.copy(nfts = Resource.loading()) }
+        controller.getWalletNfts(action.wallets)
+            .onSuccess { ctx.dispatch(GetWalletNfts.Response(Resource.success(it))) }
+            .onFailure { ctx.dispatch(GetWalletNfts.Response(Resource.failure(it))) }
     }
 
     @TypedReducer.Fun
@@ -121,6 +137,14 @@ class WalletReducer : Reducer<WalletState> {
         action: GetGobCardsAction.Response
     ): WalletState {
         return state.copy(gobCards = action.cards)
+    }
+
+    @TypedReducer.Fun
+    fun handleGetNfts(
+        state: WalletState,
+        action: GetWalletNfts.Response
+    ): WalletState {
+        return state.copy(nfts = action.nfts)
     }
 
     @TypedReducer.Fun

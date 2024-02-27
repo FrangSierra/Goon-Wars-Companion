@@ -16,10 +16,18 @@ interface GetGobCardsAction {
 
 interface TrackWalletAction {
     @TypedAction
-    data class  Request (val wallets: List<String>): Action, RootLogAction
+    data class Request(val wallets: List<String>) : Action, RootLogAction
 
     @TypedAction
     data class Response(val cards: Resource<List<GobCard>>) : Action
+}
+
+interface GetWalletNfts {
+    @TypedAction
+    data class Request(val wallets: List<String>) : Action, RootLogAction
+
+    @TypedAction
+    data class Response(val nfts: Resource<List<Nft>>) : Action
 }
 
 interface GetGobArticles {
@@ -37,7 +45,6 @@ interface GetMarketStats {
     @TypedAction
     data class Response(val stats: Resource<MarketStats>) : Action
 }
-
 
 interface GetUserGobCardsAction {
     @TypedAction

@@ -5,6 +5,7 @@ import com.durdinstudios.goonwarscollector.core.arch.maybeCatching
 import com.durdinstudios.goonwarscollector.domain.Article
 import com.durdinstudios.goonwarscollector.domain.GoonsRepository
 import com.durdinstudios.goonwarscollector.domain.opensea.NetworkListing
+import com.durdinstudios.goonwarscollector.domain.opensea.NetworkNftListingResponse
 import com.durdinstudios.goonwarscollector.domain.opensea.OpenSeaRepository
 import com.minikorp.grove.Grove
 import kotlinx.coroutines.CoroutineScope
@@ -22,6 +23,7 @@ interface WalletController {
     suspend fun getGobArticles(): Maybe<List<Article>>
 
     suspend fun getWalletCardsOwnership(wallet: List<String>): Maybe<List<CardOwnership>>
+    suspend fun getWalletNfts(wallet: List<String>): Maybe<List<Nft>>
     suspend fun getStats(): Maybe<MarketStats>
 }
 
@@ -30,6 +32,27 @@ class WalletControllerImpl(val repository: GoonsRepository, val openSeaRepositor
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    override suspend fun getWalletNfts(wallet: List<String>): Maybe<List<Nft>> =
+        maybeCatching {
+            withContext(Dispatchers.IO) {
+                val requests = wallet.map { wallet ->
+                    listOf(
+                        async { openSeaRepository.getWalletGoons(wallet) },
+                        async { openSeaRepository.getWalletLands(wallet) })
+                }.flatten()
+                val response: List<NetworkNftListingResponse> = requests.awaitAll()
+                response.map { value ->
+                    value.nfts.mapNotNull { nft ->
+                        try {
+                            nft.toNft()
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                }.flatten()
+            }
+        }
+
     override suspend fun getGobCards(): Maybe<List<GobCard>> =
         maybeCatching {
             val cards = repository.getCards()
@@ -37,6 +60,7 @@ class WalletControllerImpl(val repository: GoonsRepository, val openSeaRepositor
                 try {
                     it.toGobCard()
                 } catch (e: Exception) {
+                    Grove.e(e)
                     null
                 }
             }
@@ -54,7 +78,7 @@ class WalletControllerImpl(val repository: GoonsRepository, val openSeaRepositor
         maybeCatching {
             withContext(Dispatchers.IO) {
                 val stats = async { openSeaRepository.getCollectionStats() }
-                val nftSales = async { openSeaRepository.getCollectionLastSales(3).asset_events }
+                val nftSales = async { openSeaRepository.getCollectionLastSales(10).asset_events }
 
                 val listing = mutableListOf<NetworkListing>()
                 var list = openSeaRepository.getCollectionListing(null)
@@ -71,7 +95,7 @@ class WalletControllerImpl(val repository: GoonsRepository, val openSeaRepositor
 
                 val nftListingInfos = listingInfo
                     .map {
-                        scope.async {
+                        async {
                             openSeaRepository.getNftInfo(it.protocol_data.parameters.offer.first().identifierOrCriteria)
                         }
                     }.awaitAll()
@@ -81,7 +105,7 @@ class WalletControllerImpl(val repository: GoonsRepository, val openSeaRepositor
                     lastSales = nftSales.await().map { sale ->
                         val matchNft = sale.nft
                         MarketSale(
-                            price = "%.3f".format(sale.payment.getPrice().toFloat()),
+                            price = "%.3f".format(sale.payment.getPrice().toFloat()).plus(" ${sale.payment.symbol}"),
                             url = matchNft.image_url,
                             id = matchNft.identifier,
                             name = matchNft.name,
@@ -91,15 +115,19 @@ class WalletControllerImpl(val repository: GoonsRepository, val openSeaRepositor
                             date = Date(sale.closing_date * 1000)
                         )
                     },
-                    listing = listingInfo.map {
-                        val id = it.protocol_data.parameters.offer.first().identifierOrCriteria
-                        val matchNft = nftListingInfos.first { nft -> nft.nft.identifier == id }.nft
-                        MarketListing(
-                            price = "%.3f".format(it.price.current.getPrice().toFloat()),
-                            url = matchNft.image_url,
-                            id = id,
-                            name = matchNft.name
-                        )
+                    listing = listingInfo.mapNotNull {
+                        try {
+                            val id = it.protocol_data.parameters.offer.first().identifierOrCriteria
+                            val matchNft = nftListingInfos.first { nft -> nft.nft.identifier == id }.nft
+                            MarketListing(
+                                price = "%.3f".format(it.price.current.getPrice().toFloat()).plus(" ${it.price.current.currency}"),
+                                url = matchNft.image_url!!,
+                                id = id,
+                                name = matchNft.name!!
+                            )
+                        } catch (e: Exception) {
+                            null
+                        }
                     })
             }
         }

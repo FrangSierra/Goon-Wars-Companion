@@ -23,12 +23,23 @@ interface OpenSeaApi {
         @Query("limit") limit: Int = 100,
         @Query("next") next: String?
     ): NetworkListingResponse
+
+    @GET("api/v2/chain/{chain}/account/{address}/nfts")
+    suspend fun getWalletNfts(
+        @Path("address") address: String,
+        @Path("chain") chain: String,
+        @Query("collection") collection: String,
+        @Query("limit") limit: Int,
+        @Query("next") next: String?
+    ): NetworkNftListingResponse
 }
 
+data class NetworkNftListingResponse(val nfts: List<NetworkNftInfo>)
 data class NetworkNftInfoResponse(val nft: NetworkNftInfo)
 
 data class NetworkNftInfo(
-    val identifier: String,
-    val name: String,
-    val image_url: String
+    val identifier: String?,
+    val name: String?,
+    val image_url: String?,
+    val collection: String?
 )

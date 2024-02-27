@@ -76,8 +76,9 @@ sealed class AppDestination(
     object ForgetPassword : AppDestination(route = "forgetPassword")
     object HomeRoot : AppDestination(route = "home_root")
     object Home : AppDestination(route = "home")
-    object Welcome : AppDestination(route = "welcome")
+    object Profile : AppDestination(route = "profile")
     object Account : AppDestination(route = "account")
+    object Settings : AppDestination(route = "settings")
     object Collection : AppDestination(route = "collection")
 
     fun getRoutePattern() = Uri.Builder()

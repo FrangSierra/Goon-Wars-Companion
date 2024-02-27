@@ -3,10 +3,13 @@ package com.durdinstudios.goonwarscollector.ui.collection
 import androidx.annotation.Keep
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,16 +25,25 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Card
+import androidx.compose.material.Chip
 import androidx.compose.material.Divider
+import androidx.compose.material.Icon
 import androidx.compose.material.LeadingIconTab
+import androidx.compose.material.ModalBottomSheetLayout
+import androidx.compose.material.ModalBottomSheetValue
 import androidx.compose.material.ScaffoldState
 import androidx.compose.material.Surface
 import androidx.compose.material.TabRow
 import androidx.compose.material.TabRowDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.rememberModalBottomSheetState
 import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -53,31 +65,38 @@ import com.durdinstudios.goonwarscollector.core.arch.Resource
 import com.durdinstudios.goonwarscollector.core.arch.SwipeToRefreshPlaceholderContent
 import com.durdinstudios.goonwarscollector.core.arch.rememberSelector
 import com.durdinstudios.goonwarscollector.core.arch.useStore
+import com.durdinstudios.goonwarscollector.domain.wallet.Element
 import com.durdinstudios.goonwarscollector.domain.wallet.GetGobCardsAction
 import com.durdinstudios.goonwarscollector.domain.wallet.GobCard
+import com.durdinstudios.goonwarscollector.domain.wallet.Rarity
+import com.durdinstudios.goonwarscollector.domain.wallet.Type
 import com.durdinstudios.goonwarscollector.domain.wallet.cardsSelector
 import com.durdinstudios.goonwarscollector.domain.wallet.userCardsSelector
+import com.durdinstudios.goonwarscollector.ui.components.AppIcon
 import com.durdinstudios.goonwarscollector.ui.components.AppImage
 import com.durdinstudios.goonwarscollector.ui.components.AppPreview
 import com.durdinstudios.goonwarscollector.ui.components.AppScaffold
 import com.durdinstudios.goonwarscollector.ui.components.BodyMediumEmphasisCenter
 import com.durdinstudios.goonwarscollector.ui.components.BodyMediumEmphasisLeft
 import com.durdinstudios.goonwarscollector.ui.components.BodySmallMediumEmphasisCenter
+import com.durdinstudios.goonwarscollector.ui.components.BodySmallMediumEmphasisLeft
 import com.durdinstudios.goonwarscollector.ui.components.Heading4
+import com.durdinstudios.goonwarscollector.ui.components.MaterialChip
 import com.durdinstudios.goonwarscollector.ui.components.bottomnavigation.AppBottomBar
 import com.durdinstudios.goonwarscollector.ui.components.pagerindicators.pagerTabIndicatorOffset
+import com.durdinstudios.goonwarscollector.ui.components.placeholders.withPlaceholder
 import com.durdinstudios.goonwarscollector.ui.components.spacers.HorizontalSpacer
 import com.durdinstudios.goonwarscollector.ui.components.spacers.VerticalSpacer
 import com.durdinstudios.goonwarscollector.ui.theme.Colors
+import com.google.accompanist.insets.navigationBarsWithImePadding
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.glide.GlideImage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Composable
 fun CollectionScreen(scaffoldState: ScaffoldState = rememberScaffoldState()) {
-    val scope = rememberCoroutineScope()
     val store = useStore()
-    val context = LocalContext.current
     val selector = rememberSelector(selector = userCardsSelector)
     val gobCards = rememberSelector(selector = cardsSelector)
 
@@ -90,21 +109,187 @@ fun CollectionScreen(scaffoldState: ScaffoldState = rememberScaffoldState()) {
     CollectionScreen(selector, scaffoldState)
 }
 
+data class CollectionFilter(
+    val shiny: Boolean = false,
+    val normal: Boolean = false,
+    val owned: Boolean = false,
+    val unowned: Boolean = false,
+    val selectedElements: Set<Element> = emptySet(),
+    val selectedRarities: Set<Rarity> = emptySet(),
+    val selectedTypes: Set<Type> = emptySet(),
+) {
+    fun addOrRemoveItem(type: Type): CollectionFilter =
+        if (selectedTypes.contains(type)) this.copy(selectedTypes = selectedTypes.minus(type))
+        else this.copy(selectedTypes = selectedTypes.plus(type))
+
+    fun addOrRemoveItem(rarity: Rarity): CollectionFilter =
+        if (selectedRarities.contains(rarity)) this.copy(selectedRarities = selectedRarities.minus(rarity))
+        else this.copy(selectedRarities = selectedRarities.plus(rarity))
+
+    fun addOrRemoveItem(element: Element): CollectionFilter =
+        if (selectedElements.contains(element)) this.copy(selectedElements = selectedElements.minus(element))
+        else this.copy(selectedElements = selectedElements.plus(element))
+}
+
 @Composable
 fun CollectionScreen(
     userLoggedSelector: Resource<List<CollectionCardItem>>,
     scaffoldState: ScaffoldState = rememberScaffoldState()
 ) {
-    AppScaffold(scaffoldState = scaffoldState,
-        bottomBar = { AppBottomBar() }) {
-        SwipeToRefreshPlaceholderContent(resource = userLoggedSelector, placeholderValue = emptyList()) {
-            CollectionContent(it)
+    val sheetState = rememberModalBottomSheetState(ModalBottomSheetValue.Hidden)
+    val filterState = remember {
+        mutableStateOf(CollectionFilter())
+    }
+
+    val scope = rememberCoroutineScope()
+
+    val filteredCards = remember {
+        derivedStateOf {
+            userLoggedSelector.getOrNull()
+                ?.asSequence()
+                ?.filter {
+                    filterState.value.selectedElements.isEmpty() || filterState.value.selectedElements.contains(
+                        it.card.element
+                    )
+                }
+                ?.filter { filterState.value.selectedTypes.isEmpty() || filterState.value.selectedTypes.contains(it.card.type) }
+                ?.filter {
+                    filterState.value.selectedRarities.isEmpty() || filterState.value.selectedRarities.contains(
+                        it.card.rarity
+                    )
+                }
+                ?.filter {
+                    if (filterState.value.owned) (it.ownedAmount > 0 || it.ownedShinyAmount > 0) else true
+                }
+                ?.filter {
+                    if (filterState.value.unowned) (it.ownedAmount <= 0 && it.ownedShinyAmount <= 0) else true
+                }
+                ?.filter {
+                    if (filterState.value.shiny) (it.ownedShinyAmount > 0) else true
+                }
+                ?.filter {
+                    if (filterState.value.normal) (it.ownedAmount > 0) else true
+                }?.toList()
+                ?: emptyList()
+        }
+    }
+
+    AppScaffold(scaffoldState = scaffoldState) {
+        ModalBottomSheetLayout(
+            sheetState = sheetState,
+            modifier = Modifier.navigationBarsWithImePadding(),
+            sheetBackgroundColor = Colors.appColorPalette.primaryDark,
+            sheetContent = {
+                FilterBottomSheet(filterState)
+            }) {
+            Box(Modifier.fillMaxSize(), Alignment.BottomCenter) {
+                SwipeToRefreshPlaceholderContent(resource = userLoggedSelector, placeholderValue = emptyList()) {
+                    CollectionContent(it, filteredCards.value) {
+                        scope.launch(Dispatchers.Main) {
+                            sheetState.show()
+                        }
+                    }
+                }
+                AppBottomBar()
+            }
         }
     }
 }
 
 @Composable
-fun CollectionContent(collectionCardItems: List<CollectionCardItem>) {
+private fun FilterChip(name: String, selected: Boolean, onClick: () -> Unit) {
+    MaterialChip(
+        selected = selected,
+        text = name,
+        selectedBackgroundColor = Colors.appColorPalette.secondary,
+        unselectedBackgroundColor = Colors.appColorPalette.greyMedium,
+        onClick = onClick
+    )
+}
+
+@Composable
+private fun FilterBottomSheet(filterState: MutableState<CollectionFilter>) {
+    Column(
+        Modifier
+            .padding(16.dp)
+            .fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        BodyMediumEmphasisLeft(
+            text = "Ownership",
+            modifier = Modifier.withPlaceholder()
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip("Owned", filterState.value.owned) {
+                filterState.value = filterState.value.copy(
+                    owned = !filterState.value.owned,
+                    unowned = false
+                )
+            }
+            FilterChip("Unowned", filterState.value.unowned) {
+                filterState.value = filterState.value.copy(
+                    unowned = !filterState.value.unowned,
+                    owned = false
+                )
+            }
+        }
+        BodyMediumEmphasisLeft(
+            text = "Kind",
+            modifier = Modifier.withPlaceholder()
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip("Normal", filterState.value.normal) {
+                filterState.value = filterState.value.copy(
+                    normal = !filterState.value.normal,
+                )
+            }
+            FilterChip("Shiny", filterState.value.shiny) {
+                filterState.value = filterState.value.copy(
+                    shiny = !filterState.value.shiny,
+                )
+            }
+        }
+        BodyMediumEmphasisLeft(
+            text = "Type",
+            modifier = Modifier.withPlaceholder()
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Type.values().forEach {
+                FilterChip(it.name, filterState.value.selectedTypes.contains(it)) {
+                    filterState.value = filterState.value.addOrRemoveItem(it)
+                }
+            }
+        }
+        BodyMediumEmphasisLeft(
+            text = "Rarity",
+            modifier = Modifier.withPlaceholder()
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Rarity.values().forEach {
+                FilterChip(it.name, filterState.value.selectedRarities.contains(it)) {
+                    filterState.value = filterState.value.addOrRemoveItem(it)
+                }
+            }
+        }
+        BodyMediumEmphasisLeft(
+            text = "Element",
+            modifier = Modifier.withPlaceholder()
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Element.values().forEach {
+                FilterChip(it.name, filterState.value.selectedElements.contains(it)) {
+                    filterState.value = filterState.value.addOrRemoveItem(it)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CollectionContent(
+    collectionCardItems: List<CollectionCardItem>,
+    filteredCardItems: List<CollectionCardItem>, onOpenFilters: () -> Unit
+) {
     val pagerState = rememberPagerState(0)
     val selectedTabIndex = pagerState.currentPage
     val scope = rememberCoroutineScope()
@@ -166,29 +351,45 @@ fun CollectionContent(collectionCardItems: List<CollectionCardItem>) {
             }
         }
         HorizontalPager(state = pagerState, pageCount = 2) { tabIndex ->
-            if (tabIndex == 0) {
-                LazyVerticalGrid(modifier = Modifier
-                    .fillMaxSize()
-                    .padding(8.dp)
-                    .background(color = Colors.appColorPalette.primaryBackground),
-                    columns = GridCells.Fixed(3),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    content = {
-                        items(items = collectionCardItems, key = { it.card.id }) {
-                            CollectionGridCardItem(it)
-                        }
-                    })
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
+            Column(modifier = Modifier.fillMaxHeight()) {
+                Row(
+                    horizontalArrangement = Arrangement.End, modifier = Modifier
+                        .fillMaxWidth()
                         .padding(8.dp)
-                        .background(color = Colors.appColorPalette.primaryBackground),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(items = collectionCardItems, key = { it.card.id }) {
-                        CollectionListCardItem(it)
+                    AppIcon(
+                        R.drawable.ic_filter,
+                        null,
+                        tint = Colors.appColorPalette.onPrimary,
+                        modifier = Modifier
+                            .clickable { onOpenFilters() }
+                            .size(32.dp)
+                    )
+                }
+                if (tabIndex == 0) {
+                    LazyVerticalGrid(modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 8.dp, end = 8.dp, bottom = 60.dp)
+                        .background(color = Colors.appColorPalette.primaryBackground),
+                        columns = GridCells.Fixed(3),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        content = {
+                            items(items = filteredCardItems, key = { it.card.id }) {
+                                CollectionGridCardItem(it)
+                            }
+                        })
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 8.dp, end = 8.dp, bottom = 60.dp)
+                            .background(color = Colors.appColorPalette.primaryBackground),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(items = filteredCardItems, key = { it.card.id }) {
+                            CollectionListCardItem(it)
+                        }
                     }
                 }
             }
@@ -255,7 +456,7 @@ fun CollectionListCardItem(card: CollectionCardItem) {
                     modifier = Modifier
                         .height(64.dp)
                         .alpha(if (ownedCard.value) 1F else 0.4F),
-                    imageModel = { card.card.regularNftUrl },
+                    imageModel = { if (card.ownedShinyAmount > 0) card.card.shinyNftUrl else card.card.regularNftUrl },
                     requestBuilder = {
                         Glide.with(LocalContext.current)
                             .asDrawable()
@@ -307,7 +508,7 @@ fun CollectionGridCardItem(card: CollectionCardItem) {
                 modifier = Modifier
                     .height(200.dp)
                     .alpha(if (ownedCard.value) 1F else 0.4F),
-                imageModel = { card.card.regularNftUrl },
+                imageModel = { if (card.ownedShinyAmount > 0) card.card.shinyNftUrl else card.card.regularNftUrl },
                 requestBuilder = {
                     Glide.with(LocalContext.current)
                         .asDrawable()
@@ -330,7 +531,8 @@ fun CollectionGridCardItem(card: CollectionCardItem) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                .padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween
+        ) {
             if (card.ownedShinyAmount > 0) {
                 BodyMediumEmphasisCenter(
                     modifier = Modifier.drawBehind {
@@ -427,17 +629,17 @@ fun CollectionScreenPreview() = AppPreview {
         Resource.success(
             listOf(
                 CollectionCardItem(
-                    GobCard("0", "1", "", "", "", "", 1, 1, "", "", "", "", ""),
+                    GobCard("0", "1", "", Element.Fire, Rarity.Rare, Type.Creature, 1, 1, "", "", "", "", ""),
                     1,
                     0
                 ),
                 CollectionCardItem(
-                    GobCard("1", "1", "", "", "", "", 1, 1, "", "", "", "", ""),
+                    GobCard("1", "1", "", Element.Fire, Rarity.Rare, Type.Creature, 1, 1, "", "", "", "", ""),
                     0,
                     0
                 ),
                 CollectionCardItem(
-                    GobCard("2", "1", "", "", "", "", 1, 1, "", "", "", "", ""),
+                    GobCard("2", "1", "", Element.Fire, Rarity.Rare, Type.Creature, 1, 1, "", "", "", "", ""),
                     0,
                     1
                 )

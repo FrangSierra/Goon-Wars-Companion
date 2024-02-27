@@ -1,8 +1,11 @@
 package com.durdinstudios.goonwarscollector.ui.home
 
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,10 +26,11 @@ import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Alignment.Companion.CenterVertically
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.durdinstudios.goonwarscollector.R
@@ -57,6 +61,7 @@ import com.durdinstudios.goonwarscollector.ui.components.placeholders.withPlaceh
 import com.durdinstudios.goonwarscollector.ui.components.spacers.VerticalDivider
 import com.durdinstudios.goonwarscollector.ui.components.spacers.VerticalSpacer
 import com.durdinstudios.goonwarscollector.ui.theme.Colors
+import com.durdinstudios.goonwarscollector.utils.openUrl
 import com.skydoves.landscapist.ImageOptions
 
 @Composable
@@ -82,17 +87,21 @@ fun HomeScreen(
     articlesSelector: Resource<List<Article>> = Resource.empty(),
     scaffoldState: ScaffoldState = rememberScaffoldState()
 ) {
-    AppScaffold(scaffoldState = scaffoldState, bottomBar = { AppBottomBar() }) {
-        ResourcePlaceholderContent(
-            resource = userLoggedSelector, placeholderValue = FakeData.MarketStats.marketStats
-        ) {
-            HomeContent(it, articlesSelector)
+    AppScaffold(scaffoldState = scaffoldState) {
+        Box(Modifier.fillMaxSize(), Alignment.BottomCenter) {
+            ResourcePlaceholderContent(
+                resource = userLoggedSelector, placeholderValue = FakeData.MarketStats.marketStats
+            ) {
+                HomeContent(it, articlesSelector)
+            }
+            AppBottomBar()
         }
     }
 }
 
 @Composable
 fun HomeArticlesList(articlesSelector: Resource<List<Article>>) {
+    val context = LocalContext.current
     ResourcePlaceholderContent(
         resource = articlesSelector, placeholderValue = FakeData.Articles.articles
     ) { articles ->
@@ -111,15 +120,23 @@ fun HomeArticlesList(articlesSelector: Resource<List<Article>>) {
                     Row(
                         Modifier
                             .fillMaxWidth()
+                            .clickable {
+                                article.link?.let {
+                                    openUrl(
+                                        context = context,
+                                        url = Uri.parse(it)
+                                    )
+                                }
+                            }
                             .withPlaceholder(), verticalAlignment = Alignment.CenterVertically
                     ) {
-                       GlideAppImage(
-                           url = article.image,
-                           modifier = Modifier
-                               .height(60.dp)
-                               .width(120.dp),
-                           imageOptions = ImageOptions(contentScale = ContentScale.Fit)
-                       )
+                        GlideAppImage(
+                            url = article.image,
+                            modifier = Modifier
+                                .height(60.dp)
+                                .width(120.dp),
+                            imageOptions = ImageOptions(contentScale = ContentScale.Fit)
+                        )
                         Heading4(text = article.title ?: "", modifier = Modifier.padding(start = 12.dp))
                     }
                 }
@@ -131,38 +148,39 @@ fun HomeArticlesList(articlesSelector: Resource<List<Article>>) {
 @Composable
 fun HomeRecentlySoldList(marketSelector: MarketStats) {
     Heading4(text = "Recently sold", modifier = Modifier.padding(horizontal = 16.dp))
-    Column(
+    LazyRow(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        marketSelector.lastSales.forEach {
+        items(items = marketSelector.lastSales) {
             Card(
-                modifier = Modifier.withPlaceholder(),
+                modifier = Modifier
+                    .withPlaceholder()
+                    .width(120.dp),
                 elevation = 4.dp,
                 shape = RoundedCornerShape(8.dp),
                 backgroundColor = Colors.appColorPalette.surface,
                 border = BorderStroke(1.dp, Colors.appColorPalette.greyMedium)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = CenterVertically, horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = CenterVertically) {
-                       GlideAppImage(
-                           url = it.url,
-                           contentDescription = null,
-                           modifier = Modifier.size(64.dp),
-                           imageOptions = ImageOptions(contentScale = ContentScale.Fit)
-                       )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(contentAlignment = Alignment.TopCenter) {
+                        GlideAppImage(
+                            url = it.url,
+                            contentDescription = null,
+                            modifier = Modifier.size(120.dp),
+                            imageOptions = ImageOptions(contentScale = ContentScale.Fit)
+                        )
                         BodySmallMediumEmphasisCenter(
                             text = it.name,
-                            modifier = Modifier.padding(start = 12.dp)
+                            modifier = Modifier
+                                .background(Color.Black.copy(alpha = 0.5F))
+                                .padding(vertical = 4.dp)
+                                .fillMaxWidth()
                         )
                     }
                     BodySmallMediumEmphasisCenter(
-                        text = "${it.price} ETH", modifier = Modifier.padding(end = 12.dp),
-                        color = Colors.appColorPalette.greyLight
+                        text = it.price, modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
             }
@@ -180,26 +198,32 @@ fun HomeRecentlyListedCarrousel(marketSelector: MarketStats) {
     ) {
         items(items = marketSelector.listing) {
             Card(
-                modifier = Modifier.withPlaceholder(),
+                modifier = Modifier
+                    .withPlaceholder()
+                    .width(120.dp),
                 elevation = 4.dp,
                 shape = RoundedCornerShape(8.dp),
                 backgroundColor = Colors.appColorPalette.surface,
                 border = BorderStroke(1.dp, Colors.appColorPalette.greyMedium)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                  GlideAppImage(
-                      url = it.url,
-                      contentDescription = null,
-                      modifier = Modifier.size(120.dp),
-                      imageOptions = ImageOptions(contentScale = ContentScale.Fit)
-                  )
+                    Box(contentAlignment = Alignment.TopCenter) {
+                        GlideAppImage(
+                            url = it.url,
+                            contentDescription = null,
+                            modifier = Modifier.size(120.dp),
+                            imageOptions = ImageOptions(contentScale = ContentScale.Fit)
+                        )
+                        BodySmallMediumEmphasisCenter(
+                            text = it.name,
+                            modifier = Modifier
+                                .background(Color.Black.copy(alpha = 0.5F))
+                                .padding(vertical = 4.dp)
+                                .fillMaxWidth()
+                        )
+                    }
                     BodySmallMediumEmphasisCenter(
-                        text = it.name,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
-                    BodySmallMediumEmphasisCenter(
-                        text = "${it.price} ETH", modifier = Modifier.padding(bottom = 4.dp),
-                        color = Colors.appColorPalette.greyMedium
+                        text = it.price, modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
             }
@@ -216,29 +240,19 @@ fun HomeContent(
         Modifier
             .verticalScroll(rememberScrollState())
             .fillMaxSize()
+            .padding(bottom = 68.dp)
     ) {
-        //HomeHeader()
-        VerticalSpacer(height = 16.dp)
-        Row(
-            Modifier
+        AppImage(
+            resId = R.drawable.goon_gm,
+            contentDescription = null,
+            modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            PriceCard("GOB", R.drawable.gob_logo, price = 0.0046)
-            PriceCard("CHUNKS", R.drawable.chunks, price = 0.000562)
-        }
-        VerticalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                .height(100.dp)
+                .padding(16.dp),
+            contentScale = ContentScale.Fit
+        )
         HomeRecentlyListedCarrousel(marketSelector)
         HomeRecentlySoldList(marketSelector)
-
-        BodyMediumEmphasisLeft(
-            text = "Floor Price: ${marketSelector.floorPrice} ETH",
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .withPlaceholder()
-        )
         VerticalDivider(modifier = Modifier.padding(vertical = 12.dp))
         HomeArticlesList(articlesSelector)
     }
@@ -292,7 +306,7 @@ private fun PriceCard(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AppImage(resId = logoUrl, contentDescription = null, modifier = Modifier.size(48.dp))
+            AppImage(resId = logoUrl, contentDescription = null, modifier = Modifier.size(36.dp))
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
@@ -301,7 +315,7 @@ private fun PriceCard(
                 Column {
                     Heading4(text = "$$price")
                     VerticalSpacer(height = 4.dp)
-                    Heading6(text = token, color = Colors.appColorPalette.greyMedium)
+                    //Heading6(text = token, color = Colors.appColorPalette.greyMedium)
                 }
             }
         }

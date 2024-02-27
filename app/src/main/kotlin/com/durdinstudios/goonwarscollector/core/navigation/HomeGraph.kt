@@ -9,6 +9,8 @@ import com.durdinstudios.goonwarscollector.core.error.ErrorHandler
 import com.durdinstudios.goonwarscollector.ui.account.WelcomeScreen
 import com.durdinstudios.goonwarscollector.ui.collection.CollectionScreen
 import com.durdinstudios.goonwarscollector.ui.home.HomeScreen
+import com.durdinstudios.goonwarscollector.ui.profile.ProfileScreen
+import com.durdinstudios.goonwarscollector.ui.settings.SettingsScreen
 
 const val HOME_GRAPH_ROUTE = "home_graph"
 
@@ -29,15 +31,20 @@ fun NavGraphBuilder.HomeGraph(
         //}
 
         appComposable(AppDestination.Home) {
-            HomeScreen()
+            HomeScreen(scaffoldState)
         }
 
         appComposable(AppDestination.Collection) {
-            CollectionScreen()
+            CollectionScreen(scaffoldState)
         }
 
         appComposable(AppDestination.Account) {
-            WelcomeScreen()
+            ProfileScreen(
+                scaffoldState = scaffoldState,
+                onSettingsClick = { AppDestination.Settings.navigate(navController) })
+        }
+        appComposable(AppDestination.Settings) {
+            SettingsScreen(scaffoldState = scaffoldState)
         }
     }
 }

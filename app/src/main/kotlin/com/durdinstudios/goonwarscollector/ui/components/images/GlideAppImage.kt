@@ -30,6 +30,7 @@ fun GlideAppImage(
     url: String?,
     contentDescription: String? = null,
     imageOptions: ImageOptions = ImageOptions(),
+    thumbnailMultiplier: Float? = null,
     @DrawableRes errorImageResId: Int? = null
 ) {
     val context = LocalContext.current
@@ -60,8 +61,9 @@ fun GlideAppImage(
             requestBuilder = {
                 Glide.with(LocalContext.current)
                     .asDrawable()
-                    .diskCacheStrategy(DiskCacheStrategy.ALL)
-                    .transition(DrawableTransitionOptions.withCrossFade())
+                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                    .let { thumbnailMultiplier?.let { thumb -> it.thumbnail(thumb) } ?: it }
+                    .transition(withCrossFade())
             },
             imageOptions = ImageOptions(
                 alignment = Alignment.Center,

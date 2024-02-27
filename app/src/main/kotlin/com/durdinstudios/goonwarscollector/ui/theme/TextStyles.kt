@@ -81,7 +81,7 @@ object TextStyles {
 
     val bodySmallMediumEmphasisTextStyle = AppTextStyle(
         color = Color.White,
-        fontSize = 14.sp,
+        fontSize = 12.sp,
         fontWeight = FontWeight.Normal,
         fontFamily = roboto,
         lineSpacingExtra = 6.sp

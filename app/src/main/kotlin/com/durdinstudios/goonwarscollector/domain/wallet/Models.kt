@@ -1,6 +1,22 @@
 package com.durdinstudios.goonwarscollector.domain.wallet
 
 import androidx.annotation.Keep
+import com.durdinstudios.goonwarscollector.domain.opensea.NetworkNftInfo
+
+@Keep
+enum class Rarity {
+    Common, Rare, Epic, Legendary
+}
+
+@Keep
+enum class Type {
+    Spell, Mystery, Creature
+}
+
+@Keep
+enum class Element {
+    Fire, Water, Earth, Electric, Neutral
+}
 
 @Keep
 data class CardOwnership(
@@ -10,13 +26,21 @@ data class CardOwnership(
 )
 
 @Keep
+data class Nft(
+    val id: String,
+    val name: String,
+    val imageUrl: String,
+    val collection: String
+)
+
+@Keep
 data class GobCard(
     val id: String,
     val name: String,
     val series: String,
-    val element: String,
-    val rarity: String,
-    val type: String,
+    val element: Element,
+    val rarity: Rarity,
+    val type: Type,
     val attack: Int,
     val health: Int,
     val ability: String,
@@ -37,9 +61,9 @@ fun NetworkCard.toGobCard() = GobCard(
     custom_id,
     name,
     series,
-    element,
-    rarity,
-    type,
+    Element.valueOf(element),
+    Rarity.valueOf(rarity),
+    Type.valueOf(type),
     attack,
     health,
     ability,
@@ -47,4 +71,12 @@ fun NetworkCard.toGobCard() = GobCard(
     shiny_supply,
     regular_nft_url,
     shiny_nft_url
+)
+
+@Keep
+fun NetworkNftInfo.toNft() = Nft(
+    name = this.name!!,
+    id = this.identifier!!,
+    imageUrl = this.image_url!!,
+    collection = this.collection!!
 )

@@ -12,13 +12,16 @@ Key features include:
 
 ## Screenshots
 <div align=center>
-<img src="images/demo_1.png" width="270" height="580">
+<img src="images/demo_1.png" width="230" height="500">
   &nbsp;
   &nbsp;
-<img src="images/demo_2.png" width="270" height="580">
+<img src="images/demo_2.png" width="230" height="500">
   &nbsp;
   &nbsp;
-<img src="images/demo_3.png" width="270" height="580">
+<img src="images/demo_3.png" width="230" height="500">
+  &nbsp;
+  &nbsp;
+<img src="images/demo_4.png" width="230" height="500">
 </div>
 
 ## Want to Contribute?
